@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  # 1. Service d'IA
+  ai_service:
+    build: ./ai_service
+    # Le port 8080 est exposé en interne pour le backend
+    expose: 
+      - "8080"
+    # Port mapping optionnel si vous voulez tester l'IA directement (ex: localhost:8080)
+    # ports:
+    #   - "8080:8080"
+    image: todo-ia-ai
+
+  # 2. Backend (API)
+  backend:
+    build: ./backend
+    # Le port 5000 est mappé vers l'extérieur pour le frontend
+    ports:
+      - "5000:5000"
+    environment:
+      # L'URL interne pour joindre le service d'IA (nom du service + port)
+      AI_SERVICE_URL: http://ai_service:8080 
+    depends_on:
+      - ai_service
+    image: todo-ia-backend
+
+  # 3. Frontend (Client)
+  frontend:
+    build: ./frontend
+    # Le port 80 est mappé vers l'extérieur
+    ports:
+      - "80:80" 
+    depends_on:
+      - backend
+    image: todo-ia-frontend

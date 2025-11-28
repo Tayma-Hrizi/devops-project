@@ -1,0 +1,68 @@
+# ansible/devops_server_playbook.yml
+---
+- name: Configuration du Serveur DevOps (Jenkins, Docker, Nagios)
+  hosts: all
+  become: yes
+
+  tasks:
+    - name: Mise à jour et installation des dépendances générales
+      ansible.builtin.apt:
+        name: 
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+          - git
+          - python3-pip
+          - openjdk-17-jdk 
+        update_cache: yes
+        state: latest
+
+    # --- Installation de Jenkins ---
+    - name: Télécharger la clé GPG de Jenkins
+      ansible.builtin.get_url:
+        url: https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+        dest: /usr/share/keyrings/jenkins-keyring.asc
+        mode: '0644'
+        force: yes
+
+    - name: Ajouter le dépôt Jenkins à la source APT
+      ansible.builtin.apt_repository:
+        repo: "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] https://pkg.jenkins.io/debian-stable binary/"
+        state: present
+        update_cache: yes
+
+    - name: Installer Jenkins
+      ansible.builtin.apt:
+        name: jenkins
+        state: latest
+        update_cache: yes
+
+    - name: Démarrer et activer Jenkins
+      ansible.builtin.service:
+        name: jenkins
+        state: started
+        enabled: yes
+
+    # --- Installation de Docker (pour le CI/Build) ---
+    - name: Installer Docker Engine et CLI
+      ansible.builtin.apt:
+        name: 
+          - docker.io # Utiliser docker.io pour une installation simple sur Ubuntu 20.04/22.04
+        state: latest
+        update_cache: yes
+
+    - name: Ajouter l'utilisateur 'jenkins' au groupe docker
+      ansible.builtin.user:
+        name: jenkins
+        groups: docker
+        append: yes
+        
+    # --- Installation des Outils Nagios (NRPE Client) ---
+    - name: Installer le plugin Nagios (NRPE)
+      ansible.builtin.apt:
+        name: 
+          - nagios-plugins
+          - nagios-nrpe-server
+        state: latest
+        update_cache: yes
