@@ -1,50 +1,55 @@
-# -*- mode: ruby -*-
-# vi: set ft=ruby :
-
 Vagrant.configure("2") do |config|
-  
-  # Utiliser une box Ubuntu stable pour le provisionnement
-  config.vm.box = "ubuntu/focal64" 
-  
-  # --- 1. VM du Serveur DevOps/Jenkins (CI/CD, Nagios) ---
-  config.vm.define "devops-server" do |devops|
-    devops.vm.hostname = "devops-server"
-    
-    # Configuration du réseau privé avec IP statique
-    devops.vm.network "private_network", ip: "192.168.33.10"
-    
-    # Redirection de port pour accéder à Jenkins depuis la machine hôte
-    devops.vm.network "forwarded_port", guest: 8080, host: 8080, id: "jenkins_web_ui"
-    
-    # Ressources accrues pour le serveur Jenkins
-    devops.vm.provider "virtualbox" do |vb|
-      vb.memory = "2048" # 2GB de RAM
-      vb.cpus = "2"      # 2 CPUs
-    end
-    
-    # Provisionnement Ansible pour installer Jenkins, Docker (pour le build), et Nagios
-    devops.vm.provision "ansible" do |ansible|
-      ansible.playbook = "ansible/devops_server_playbook.yml"
-    end
+  # Define the base box to use (e.g., Ubuntu 22.04)
+  config.vm.box = "ubuntu/jammy64"  # Adjust the box version as needed
+
+  # Configure the VM's network settings (optional, e.g., private IP)
+  config.vm.network "private_network", type: "dhcp"
+
+  # Set up VM provider settings (optional, e.g., amount of RAM and CPUs)
+  config.vm.provider "virtualbox" do |vb|
+    vb.memory = "2048"  # Set memory to 2GB (adjust as necessary for Minikube)
+    vb.cpus = 2         # Set number of CPUs
   end
 
+  # Provisioning script to install Docker, Jenkins, and Minikube
+  config.vm.provision "shell", inline: <<-SHELL
+    # Update package list
+    sudo apt-get update
 
-  # --- 2. VM de l'Hôte d'Application (Déploiement Docker Compose) ---
-  config.vm.define "app-host" do |app|
-    app.vm.hostname = "app-host"
-    
-    # Configuration du réseau privé avec IP statique
-    app.vm.network "private_network", ip: "192.168.33.20"
-    
-    # Redirection de port pour accéder à l'application depuis la machine hôte
-    # Le frontend écoute sur le port 80 du conteneur, mappé ici au port 80 de l'hôte
-    app.vm.network "forwarded_port", guest: 80, host: 80, id: "app_frontend"
-    # Laissez le port 5000 (backend) accessible en interne si Nagios le vérifie
-    
-    # Provisionnement Ansible pour installer Docker Engine et Docker Compose
-    app.vm.provision "ansible" do |ansible|
-      ansible.playbook = "ansible/app_host_playbook.yml"
-    end
-  end
-  
-end
+    # Install Docker
+    sudo apt-get install -y apt-transport-https ca-certificates curl software-properties-common
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+    sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+    sudo apt-get update
+    sudo apt-get install -y docker-ce docker-ce-cli containerd.io
+
+    # Add current user to docker group to run docker without sudo
+    sudo usermod -aG docker vagrant
+
+    # Install Jenkins
+    sudo apt upgrade -y
+    sudo apt install fontconfig openjdk-17-jre -y
+    sudo apt-get install -y init-system-helpers=1.54~ubuntu1
+    sudo wget -O /usr/share/keyrings/jenkins-keyring.asc https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+    echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc]" https://pkg.jenkins.io/debian-stable binary/ | sudo tee /etc/apt/sources.list.d/jenkins.list > /dev/null
+    sudo apt-get update
+    sudo apt-get install -y jenkins
+
+    # Start Jenkins service
+    sudo systemctl start jenkins
+    sudo systemctl enable jenkins
+
+    # Open firewall port for Jenkins (default port 8080)
+    sudo ufw allow 8080
+    sudo ufw allow 3000
+    sudo ufw enable
+    sudo usermod -aG docker jenkins
+    sudo systemctl restart jenkins
+
+
+  SHELL
+
+  # Optional: Forward port 8080 for Jenkins access on the host machine
+  config.vm.network "forwarded_port", guest: 8080, host: 8080
+  config.vm.network "forwarded_port", guest: 3000, host: 3000
+end  
