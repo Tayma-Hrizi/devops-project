@@ -1,24 +1,19 @@
-services:
-  # 1. Service d'IA
-  ai_service:
-    build: ./ai_service
-    expose: 
-      - "8080"
 
-  # 2. Backend (API)
+services:
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"
+    restart: unless-stopped
+
   backend:
     build: ./backend
     ports:
       - "5000:5000"
-    environment:
-      AI_SERVICE_URL: http://ai_service:8080 
-    depends_on:
-      - ai_service
+    restart: unless-stopped
 
-  # 3. Frontend (Client)
-  frontend:
-    build: ./frontend
+  ai_service:
+    build: ./ai_service
     ports:
-      - "80:80" 
-    depends_on:
-      - backend
+      - "8081:8080"
+    restart: unless-stopped
