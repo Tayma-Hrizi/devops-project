@@ -13,6 +13,8 @@ Application ToDo intelligente avec priorisation automatique des tâches via IA.
 - Backend : Python, Flask
 - IA : FastAPI, Python
 - Docker & Docker Compose
+- Vagrant
+- Jenkins
 
 # Structure du projet
 todo-ia-app/
@@ -37,3 +39,4 @@ todo-ia-app/
 # Lancement
 ```bash
 docker-compose up --build
+
